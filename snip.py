@@ -1,9 +1,11 @@
 import gi
 import os
+import signal
 
 gi.require_version("Gtk", "3.0")
+gi.require_version('AppIndicator3', '0.1')
 
-from gi.repository import Gtk, Gdk, GLib
+from gi.repository import Gtk, Gdk, GLib, AppIndicator3
 
 class PreviewEditor(Gtk.DrawingArea):
     def __init__(self, preview):
@@ -84,28 +86,30 @@ class PreviewWindow(Gtk.Window):
             self.editor.cleanup()
             self.hide()
 
-class MainWindow(Gtk.Window):
+class TrayIcon:
     def __init__(self):
-        super().__init__(title="Snipping tool")
-
         self.preview = PreviewWindow()
-        self.preview.connect("hide", self.on_preview_hide)
-
-        self.set_default_size(100, 50)
-        self.set_icon_from_file(get_resource_path("icon.png"))
+        self.indicator = AppIndicator3.Indicator.new(
+            "snip-py",
+            "edit-cut-symbolic",
+            AppIndicator3.IndicatorCategory.APPLICATION_STATUS
+        )
+        self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
         
-        self.connect("destroy", Gtk.main_quit)
+        self.menu = Gtk.Menu()
 
-        button_take_screenshot = Gtk.Button(label="Take screenshot")
-        button_take_screenshot.connect("clicked", self.on_take_screenshot)
+        self.add_menuitem("Take screenshot", self.take_screenshot)
+        self.add_menuitem("Quit", self.quit)
 
-        grid = Gtk.Grid()
-        grid.attach(button_take_screenshot, 0, 1, 1, 1)
-        self.add(grid)
+        self.indicator.set_menu(self.menu)
 
-    def on_take_screenshot(self, widget):
-        self.prev_pos = self.get_position()
-        self.hide()
+    def add_menuitem(self, label, callback):
+        item = Gtk.MenuItem(label=label)
+        item.connect("activate", callback)
+        item.show()
+        self.menu.append(item)
+
+    def take_screenshot(self, source):
         GLib.timeout_add(200, self.show_preview)
 
     def show_preview(self):
@@ -118,19 +122,15 @@ class MainWindow(Gtk.Window):
             self.preview.set_preview(pb)
             self.preview.show_all()
 
-    def on_preview_hide(self, widget):
-        self.show_all()
+    def quit(self, source):
+        Gtk.main_quit()
 
-        (x, y) = self.prev_pos
-        self.move(x, y)
+def main():
+    # Required for the indicator to function properly
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-def get_resource_path(rel_path):
-    dir_of_py_file = os.path.dirname(__file__)
-    rel_path_to_resource = os.path.join(dir_of_py_file, rel_path)
-    abs_path_to_resource = os.path.abspath(rel_path_to_resource)
-    return abs_path_to_resource
+    TrayIcon()
+    Gtk.main()
 
-win = MainWindow()
-win.show_all()
-
-Gtk.main()
+if __name__ == "__main__":
+    main()
