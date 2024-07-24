@@ -120,6 +120,7 @@ class TrayIcon:
         pb = Gdk.pixbuf_get_from_window(root_win, 0, 0, w, h)
         if (pb != None):
             self.preview.set_preview(pb)
+            self.preview.set_keep_above(True);
             self.preview.show_all()
 
     def quit(self, source):
